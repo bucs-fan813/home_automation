@@ -1,0 +1,60 @@
+alias: Smart Irrigation - Dynamic Zones (Rachio + Ecowitt + OpenWeatherMap)
+description: >
+  Automatically run Rachio zones before sunrise if soil moisture is low, there's
+  no rain forecast in the next 3 days, temperature is above 50°F, and wind speed
+  is below 15 mph. Zones run sequentially for 15 minutes.
+triggers:
+  - event: sunrise
+    offset: "-02:00:00"
+    trigger: sun
+conditions:
+  - condition: numeric_state
+    entity_id: sensor.openweathermap_temperature
+    above: 50
+  - condition: numeric_state
+    entity_id: sensor.openweathermap_wind_speed
+    below: 15
+  - condition: template
+    value_template: |
+      {% set rain_in_3_days = daily_forecast['weather.openweathermap'][:3]
+         | selectattr('precipitation', 'defined')
+         | selectattr('precipitation', '>', 0)
+         | list %}
+      {{ rain_in_3_days | length == 0 }}
+actions:
+  - alias: Get forecast for the next 3 days
+    data:
+      type: daily
+    target:
+      entity_id: weather.openweathermap
+    response_variable: daily_forecast
+    action: weather.get_forecasts
+  - variables:
+      all_zones: |
+        {% set switches = states.switch
+            | selectattr('entity_id', 'match', 'switch.rachio_zone_\\d+')
+            | sort(attribute='entity_id') %}
+        {% set zones = [] %} {% for s in switches %}
+          {% set zone_num = s.entity_id.split('_')[-1] %}
+          {% set moisture = 'sensor.ecowitt_moisture_zone_' ~ zone_num %}
+          {% set z = {
+            'switch_entity': s.entity_id,
+            'moisture_entity': moisture,
+            'runtime': '00:15:00'
+          } %}
+          {% set zones = zones + [z] %}
+        {% endfor %} {{ zones }}
+  - repeat:
+      for_each: "{{ all_zones }}"
+      sequence:
+        - condition: template
+          value_template: |
+            {{ states(repeat.item.moisture_entity) | float < 40 }}
+        - target:
+            entity_id: "{{ repeat.item.switch_entity }}"
+          action: switch.turn_on
+        - delay: "{{ repeat.item.runtime }}"
+        - target:
+            entity_id: "{{ repeat.item.switch_entity }}"
+          action: switch.turn_off
+mode: single
