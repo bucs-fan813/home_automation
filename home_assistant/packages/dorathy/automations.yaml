@@ -1,0 +1,76 @@
+automation:
+  - alias: Smart Irrigation - Dynamic Zones (Rachio + Ecowitt + OpenWeatherMap)
+    description: >
+      Automatically run Rachio zones before sunrise if soil moisture is low, there's
+      no rain forecast in the next 3 days, temperature is above 50°F, and wind speed
+      is below 15 mph. Zones run sequentially for 15 minutes.
+    triggers:
+      - event: sunrise
+        offset: "-02:00:00"
+        trigger: sun
+    conditions:
+      - condition: numeric_state
+        entity_id: sensor.openweathermap_temperature
+        above: 40
+      - condition: numeric_state
+        entity_id: sensor.openweathermap_wind_speed
+        below: 15
+      - condition: state
+        entity_id: binary_sensor.rain_in_next_3_days
+        state: "off"
+    actions:
+      - variables:
+          all_zones: |
+            {% set switches = states.switch
+                | selectattr('entity_id', 'match', 'switch.rachio_zone_\\d+')
+                | sort(attribute='entity_id') %}
+            {% set zones = [] %} {% for s in switches %}
+              {% set zone_num = s.entity_id.split('_')[-1] %}
+              {% set moisture = 'sensor.ecowitt_moisture_zone_' ~ zone_num %}
+              {% set z = {
+                'switch_entity': s.entity_id,
+                'moisture_entity': moisture,
+                'runtime': '00:15:00'
+              } %}
+              {% set zones = zones + [z] %}
+            {% endfor %} {{ zones }}
+      - repeat:
+          for_each: "{{ all_zones }}"
+          sequence:
+            - condition: template
+              value_template: |
+                {{ states(repeat.item.moisture_entity) | float < 40 }}
+            - target:
+                entity_id: "{{ repeat.item.switch_entity }}"
+              action: switch.turn_on
+            - delay: "{{ repeat.item.runtime }}"
+            - target:
+                entity_id: "{{ repeat.item.switch_entity }}"
+              action: switch.turn_off
+    mode: single
+  - alias: Update Forecast
+    description: >
+      Query the OpenWeatherMap integration to get the forecast. The 'daily' query
+      will return a 7-day forcast but we only need 3 days.
+    triggers:
+      - trigger: time_pattern
+        hours: /4
+    actions:
+      - action: weather.get_forecasts
+        data:
+          type: daily
+        target:
+          entity_id: weather.openweathermap
+        response_variable: forecast_data
+      - action: input_text.set_value
+        metadata: {}
+        data:
+          value: |-
+            {% set rain_days = forecast_data["weather.openweathermap"].forecast[:3]
+              | selectattr('precipitation','defined')
+              | selectattr('precipitation','>',0.25)
+              | list %}
+            {{ rain_days }}
+        target:
+          entity_id: input_text.weather_forecast_json
+    mode: single
