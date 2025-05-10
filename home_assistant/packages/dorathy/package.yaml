@@ -1,0 +1,3 @@
+package:
+  name: Dorathy Package
+  template: !include sensors.yaml
