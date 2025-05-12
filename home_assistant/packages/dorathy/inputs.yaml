@@ -2,4 +2,4 @@ input_text:
   weather_forecast_json:
     name: Weather Forecast JSON
     mode: text
-    icon: mdi:weather-pouring
+    icon: mdi:code-json

@@ -1,0 +1,6 @@
+homeassistant:
+  customize:
+    automation.smart_irrigation:
+      icon: mdi:sprinkler-variant
+    automation.update_forecast:
+      icon: mdi:clouds

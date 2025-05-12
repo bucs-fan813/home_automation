@@ -1,7 +1,9 @@
 binary_sensor:
-  - name: "3 Day Forecast"
-    unique_id: rain_next_3_days
-    device_class: moisture
-    state: "{{ states('input_text.weather_forecast_json') }}"
-    attributes:
-      forecast_checked: "{{ now().isoformat() }}"
+  - platform: template
+    sensors:
+      rain_next_3_days:
+        friendly_name: "3 Day Forecast"
+        device_class: moisture
+        value_template: "{{ states('input_text.weather_forecast_json') }}"
+        attribute_templates:
+          forecast_checked: "{{ now().isoformat() }}"

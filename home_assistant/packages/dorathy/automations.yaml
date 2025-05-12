@@ -1,5 +1,6 @@
 automation:
-  - alias: Smart Irrigation - Dynamic Zones (Rachio + Ecowitt + OpenWeatherMap)
+  - id: smart_irrigation
+    alias: Smart Irrigation - Dynamic Zones (Rachio + Ecowitt + OpenWeatherMap)
     description: >
       Automatically run Rachio zones before sunrise if soil moisture is low, there's
       no rain forecast in the next 3 days, temperature is above 50°F, and wind speed
@@ -48,7 +49,8 @@ automation:
                 entity_id: "{{ repeat.item.switch_entity }}"
               action: switch.turn_off
     mode: single
-  - alias: Update Forecast
+  - id: update_forecast
+    alias: Update Forecast
     description: >
       Query the OpenWeatherMap integration to get the forecast. The 'daily' query
       will return a 7-day forcast but we only need 3 days.
